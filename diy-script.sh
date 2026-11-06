@@ -1,6 +1,6 @@
 #!/bin/bash
 # 修改默认IP（你主路由是10.10.1.1，需要就取消注释，我这里先注释）
-# sed -i 's/192.168.1.1/10.10.1.1/g' package/base-files/files/bin/config_generate
+sed -i 's/192.168.1.1/10.10.1.1/g' package/base-files/files/bin/config_generate
 # 更改默认 Shell 为 zsh
 # sed -i 's/\/bin\/ash/\/usr\/bin\/zsh/g' package/base-files/files/etc/passwd
 # TTYD 免登录
