@@ -36,25 +36,30 @@ jobs:
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        docker rmi $(docker images -q)
+        docker rmi $(docker images -q) || true
         sudo rm -rf /usr/share/dotnet /etc/apt/sources.list.d /usr/local/lib/android $AGENT_TOOLSDIRECTORY
         sudo -E apt-get -y purge azure-cli ghc* zulu* llvm* firefox google* dotnet* powershell openjdk* mongodb* moby* || true
         sudo -E apt-get -y update
-        sudo -E apt-get -y install $(curl -fsSL is.gd/depends_ubuntu_2204)
+        sudo -E apt-get -y install build-essential flex bison gawk python3 python3-pip python3-setuptools unzip libssl-dev libncurses5-dev git subversion wget curl rsync ca-certificates
         sudo -E systemctl daemon-reload
         sudo -E apt-get -y autoremove --purge
         sudo -E apt-get -y clean
         sudo timedatectl set-timezone "$TZ"
-    # ========== 替换这里：去掉maximize-build-space，改用手动清理 ==========
-    - name: Free Disk Space(手动释放磁盘空间)
+    - name: Free Disk Space + Add Swap
       run: |
-        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-        sudo apt-get remove -y azure-cli ghc llvm firefox google-chrome dotnet powershell openjdk mongodb moby || true
-        sudo apt-get autoremove -y
+        set -e
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache /opt/az /usr/local/.ghcup
+        sudo apt-get remove -y azure-cli ghc* llvm* firefox google-chrome* dotnet* powershell openjdk* mongodb* moby* || true
+        sudo apt-get autoremove -y --purge
         sudo apt-get clean
+        sudo fallocate -l 16G /swapfile
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
         df -h
+        free -h
     - name: Checkout
-      uses: actions/checkout@main
+      uses: actions/checkout@v4
     - name: Clone Source Code(克隆源代码)
       run: |
         df -hT $GITHUB_WORKSPACE
@@ -81,20 +86,18 @@ jobs:
         ccache: false
         mixkey: ${{ env.SOURCE_REPO }}-${{ env.REPO_BRANCH }}-${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}
         prefix: ${{ env.OPENWRT_PATH }}
-    
     - name: Install Feeds(安装feeds)
       run: |
         cd $OPENWRT_PATH
         ./scripts/feeds update -a
         ./scripts/feeds install -a
-    - name: Apply patches(安装补丁)   
+    - name: Apply patches(安装补丁)
       run: |
         git config --global user.name "OpenWrt Builder"
         git config --global user.email "buster-openwrt@ovvo.uk"
         cp $PATCHES_FILE_1 $OPENWRT_PATH/feeds/luci
         cd $OPENWRT_PATH/feeds/luci
         git am 0001-show-soc-status-on-luci.patch
-  
     - name: Load Custom Configuration(加载自定义配置)
       run: |
         [ -e files ] && mv files $OPENWRT_PATH/files
